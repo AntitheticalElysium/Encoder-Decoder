@@ -1,0 +1,4 @@
+numpy>=1.26,<3.0
+d2l
+torch
+torchvision
