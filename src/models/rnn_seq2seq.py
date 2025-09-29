@@ -1,7 +1,5 @@
 import numpy as np
-
-def sigmoid(x):
-    return 1 / (1 + np.exp(-x))
+from src.utils import sigmoid
 
 class Embedding(object):
     def __init__(self, vocab_size, embed_dim):
