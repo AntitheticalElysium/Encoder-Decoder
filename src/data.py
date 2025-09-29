@@ -1,5 +1,6 @@
 import os
 import zipfile
+import pickle
 from d2l import torch as d2l
 from vocab import Vocab
 
@@ -98,18 +99,49 @@ def build_vocabulary(filtered_pairs, min_freq=1):
     vocab_tgt.save('../data/vocab_tgt.json')
     return vocab_src, vocab_tgt
 
-def convert_to_ids():
-    pass
+def convert_to_ids(filtered_pairs, vocab_src, vocab_tgt):
+    src_ids_list = []
+    tgt_input_ids_list = []
+    tgt_output_ids_list = []
 
-def save_preprocessed_data():
-    pass
+    for eng_tok, fra_tok in filtered_pairs:
+        # encoder input: source IDs + <eos>
+        src_ids = vocab_src.encode(eng_tok) + [vocab_src.stoi['<eos>']]
+        src_ids_list.append(src_ids)
+        # decoder input: <sos> + target IDs
+        tgt_input_ids = [vocab_tgt.stoi['<sos>']] + vocab_tgt.encode(fra_tok)
+        tgt_input_ids_list.append(tgt_input_ids)
+        # decoder output: target IDs + <eos>
+        tgt_output_ids = vocab_tgt.encode(fra_tok) + [vocab_tgt.stoi['<eos>']]
+        tgt_output_ids_list.append(tgt_output_ids)
+
+    return src_ids_list, tgt_input_ids_list, tgt_output_ids_list
+
+def save_preprocessed_data(src_ids_list, tgt_input_ids_list, tgt_output_ids_list,
+                           vocab_src, vocab_tgt, save_path='../data/preprocessed_data.pkl'):
+    data = {
+        'src_ids': src_ids_list,
+        'tgt_input_ids': tgt_input_ids_list,
+        'tgt_output_ids': tgt_output_ids_list,
+        'vocab_src': vocab_src,
+        'vocab_tgt': vocab_tgt
+    }
+
+    with open(save_path, 'wb') as f:
+        pickle.dump(data, f)
+    
+    print(f'Preprocessed data saved to {save_path}')
 
 def explore_data():
     pass
 
 if __name__ == '__main__':
-    download_and_save_raw_data()
-    normalize_corpus()
+    #download_and_save_raw_data()
+    #normalize_corpus()
     tokenized_pairs = tokenize_corpus()
     filtered_pairs = filter_pairs(tokenized_pairs)
-    build_vocabulary(filtered_pairs)
+    #build_vocabulary(filtered_pairs)
+    vocab_src = Vocab.load('../data/vocab_src.json')
+    vocab_tgt = Vocab.load('../data/vocab_tgt.json')
+    src_ids_list, tgt_input_ids_list, tgt_output_ids_list = convert_to_ids(filtered_pairs, vocab_src, vocab_tgt)
+    save_preprocessed_data(src_ids_list, tgt_input_ids_list, tgt_output_ids_list, vocab_src, vocab_tgt)
