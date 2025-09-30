@@ -2,9 +2,9 @@ import os
 import zipfile
 import pickle
 from d2l import torch as d2l
-from vocab import Vocab
+from src.vocab import Vocab
 
-def download_and_save_raw_data(root='../data', filename='raw.txt'):
+def download_and_save_raw_data(root='data', filename='raw.txt'):
     os.makedirs(root, exist_ok=True)
     
     zip_path = d2l.download('fra-eng', root)
@@ -24,7 +24,7 @@ def download_and_save_raw_data(root='../data', filename='raw.txt'):
         for _ in range(5):
             print(f.readline().strip())
 
-def normalize_corpus(raw_path='../data/raw.txt', norm_path='../data/norm.txt'):
+def normalize_corpus(raw_path='data/raw.txt', norm_path='data/norm.txt'):
     with open(raw_path, 'r', encoding='utf-8') as f_in, \
          open(norm_path, 'w', encoding='utf-8') as f_out:
         for line in f_in:
@@ -50,7 +50,7 @@ def normalize_corpus(raw_path='../data/raw.txt', norm_path='../data/norm.txt'):
         for _ in range(5):
             print(f.readline().strip())
 
-def tokenize_corpus(norm_path='../data/norm.txt'):
+def tokenize_corpus(norm_path='data/norm.txt'):
     with open(norm_path, 'r', encoding='utf-8') as f:
         lines = f.readlines()
 
@@ -94,9 +94,9 @@ def build_vocabulary(filtered_pairs, min_freq=1):
     for token in list(vocab_tgt.stoi.keys())[:10]:
         print(f'{token}: {vocab_tgt.stoi[token]}')
 
-    print('\nSaving vocabularies to ../data/vocab_src.json and ../data/vocab_tgt.json')
-    vocab_src.save('../data/vocab_src.json')
-    vocab_tgt.save('../data/vocab_tgt.json')
+    print('\nSaving vocabularies to data/vocab_src.json and data/vocab_tgt.json')
+    vocab_src.save('data/vocab_src.json')
+    vocab_tgt.save('data/vocab_tgt.json')
     return vocab_src, vocab_tgt
 
 def convert_to_ids(filtered_pairs, vocab_src, vocab_tgt):
@@ -118,7 +118,7 @@ def convert_to_ids(filtered_pairs, vocab_src, vocab_tgt):
     return src_ids_list, tgt_input_ids_list, tgt_output_ids_list
 
 def save_preprocessed_data(src_ids_list, tgt_input_ids_list, tgt_output_ids_list,
-                           vocab_src, vocab_tgt, save_path='../data/preprocessed_data.pkl'):
+                           vocab_src, vocab_tgt, save_path='data/preprocessed_data.pkl'):
     data = {
         'src_ids': src_ids_list,
         'tgt_input_ids': tgt_input_ids_list,
@@ -136,12 +136,12 @@ def explore_data():
     pass
 
 if __name__ == '__main__':
-    #download_and_save_raw_data()
-    #normalize_corpus()
+    download_and_save_raw_data()
+    normalize_corpus()
     tokenized_pairs = tokenize_corpus()
     filtered_pairs = filter_pairs(tokenized_pairs)
-    #build_vocabulary(filtered_pairs)
-    vocab_src = Vocab.load('../data/vocab_src.json')
-    vocab_tgt = Vocab.load('../data/vocab_tgt.json')
+    build_vocabulary(filtered_pairs)
+    vocab_src = Vocab.load('data/vocab_src.json')
+    vocab_tgt = Vocab.load('data/vocab_tgt.json')
     src_ids_list, tgt_input_ids_list, tgt_output_ids_list = convert_to_ids(filtered_pairs, vocab_src, vocab_tgt)
     save_preprocessed_data(src_ids_list, tgt_input_ids_list, tgt_output_ids_list, vocab_src, vocab_tgt)
