@@ -102,7 +102,7 @@ if __name__ == '__main__':
                     pickle.dump(encoder, f)
                 with open('models/decoder.pkl', 'wb') as f:
                     pickle.dump(decoder, f)
-                print('New best model saved with loss {best_loss:.4f}')
+                print(f'Iteration {i}, Loss: {loss:.4f} (improved, model saved)')
             else:
                 print(f'Iteration {i}, Loss: {loss:.4f}')
 
