@@ -49,7 +49,14 @@ if __name__ == '__main__':
     with open('models/decoder.pkl', 'rb') as f:
         decoder = pickle.load(f)
         
-    all_learnable_layers = [encoder.embedding, encoder.gru.gru_cell, decoder.embedding, decoder.gru.gru_cell, decoder.fc]
+    all_learnable_layers = [
+        encoder.embedding, 
+        encoder.gru.forward_gru.gru_cell,
+        encoder.gru.backward_gru.gru_cell,
+        decoder.embedding, 
+        decoder.gru.gru_cell, 
+        decoder.fc
+    ]
     model_to_gpu(all_learnable_layers)
 
     vocab_src = Vocab.load('data/vocab_src.json')
