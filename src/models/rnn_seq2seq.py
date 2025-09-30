@@ -1,4 +1,4 @@
-import numpy as np
+import cupy as np
 from src.utils import sigmoid, softmax
 
 class Embedding(object):
@@ -42,14 +42,14 @@ class GRUCell(object):
         self.U_h = np.random.uniform(-0.1, 0.1, (hidden_dim, hidden_dim))
         self.b_h = np.zeros(hidden_dim)
 
-        self.dW_z, self.dU_z, self.db_z = [np.zeros_like(p) for p in [self.W_z, self.U_z, self.b_z]]
-        self.dW_r, self.dU_r, self.db_r = [np.zeros_like(p) for p in [self.W_r, self.U_r, self.b_r]]
-        self.dW_h, self.dU_h, self.db_h = [np.zeros_like(p) for p in [self.W_h, self.U_h, self.b_h]]
+        self.d_W_z, self.d_U_z, self.d_b_z = [np.zeros_like(p) for p in [self.W_z, self.U_z, self.b_z]]
+        self.d_W_r, self.d_U_r, self.d_b_r = [np.zeros_like(p) for p in [self.W_r, self.U_r, self.b_r]]
+        self.d_W_h, self.d_U_h, self.d_b_h = [np.zeros_like(p) for p in [self.W_h, self.U_h, self.b_h]]
 
         self.params = {
-            'W_z': (self.W_z, self.dW_z), 'U_z': (self.U_z, self.dU_z), 'b_z': (self.b_z, self.db_z),
-            'W_r': (self.W_r, self.dW_r), 'U_r': (self.U_r, self.dU_r), 'b_r': (self.b_r, self.db_r),
-            'W_h': (self.W_h, self.dW_h), 'U_h': (self.U_h, self.dU_h), 'b_h': (self.b_h, self.db_h)
+            'W_z': (self.W_z, self.d_W_z), 'U_z': (self.U_z, self.d_U_z), 'b_z': (self.b_z, self.d_b_z),
+            'W_r': (self.W_r, self.d_W_r), 'U_r': (self.U_r, self.d_U_r), 'b_r': (self.b_r, self.d_b_r),
+            'W_h': (self.W_h, self.d_W_h), 'U_h': (self.U_h, self.d_U_h), 'b_h': (self.b_h, self.d_b_h)
         }
         self.cache = {}
 
@@ -73,28 +73,28 @@ class GRUCell(object):
         d_h_prev = grad_output * (1 - z_t)
         d_tanh_input = d_h_tilde * (1 - h_tilde**2)
         
-        self.db_h += np.sum(d_tanh_input, axis=0)
-        self.dW_h += np.dot(x_t.T, d_tanh_input)
+        self.d_b_h += np.sum(d_tanh_input, axis=0)
+        self.d_W_h += np.dot(x_t.T, d_tanh_input)
         
         d_rh = np.dot(d_tanh_input, self.U_h.T)
-        self.dU_h += np.dot((r_t * h_prev).T, d_tanh_input)
+        self.d_U_h += np.dot((r_t * h_prev).T, d_tanh_input)
         
         d_r_t = d_rh * h_prev
         d_h_prev += d_rh * r_t
         d_xt = np.dot(d_tanh_input, self.W_h.T)
         d_sigmoid_input_r = d_r_t * r_t * (1 - r_t)
         
-        self.db_r += np.sum(d_sigmoid_input_r, axis=0)
-        self.dW_r += np.dot(x_t.T, d_sigmoid_input_r)
-        self.dU_r += np.dot(h_prev.T, d_sigmoid_input_r)
+        self.d_b_r += np.sum(d_sigmoid_input_r, axis=0)
+        self.d_W_r += np.dot(x_t.T, d_sigmoid_input_r)
+        self.d_U_r += np.dot(h_prev.T, d_sigmoid_input_r)
         
         d_h_prev += np.dot(d_sigmoid_input_r, self.U_r.T)
         d_xt += np.dot(d_sigmoid_input_r, self.W_r.T)
         d_sigmoid_input_z = d_z_t * z_t * (1 - z_t)
         
-        self.db_z += np.sum(d_sigmoid_input_z, axis=0)
-        self.dW_z += np.dot(x_t.T, d_sigmoid_input_z)
-        self.dU_z += np.dot(h_prev.T, d_sigmoid_input_z)
+        self.d_b_z += np.sum(d_sigmoid_input_z, axis=0)
+        self.d_W_z += np.dot(x_t.T, d_sigmoid_input_z)
+        self.d_U_z += np.dot(h_prev.T, d_sigmoid_input_z)
         
         d_h_prev += np.dot(d_sigmoid_input_z, self.U_z.T)
         d_xt += np.dot(d_sigmoid_input_z, self.W_z.T)
@@ -145,12 +145,42 @@ class GRULayer(object):
         
         d_initial_hidden = d_h_next
         return d_inputs, d_initial_hidden
-        
+
+class BidirectionalGRULayer(object):
+    def __init__(self, input_dim, hidden_dim):
+        self.hidden_dim = hidden_dim
+        self.forward_gru = GRULayer(input_dim, hidden_dim)
+        self.backward_gru = GRULayer(input_dim, hidden_dim)
+
+    def forward(self, inputs):
+        h_fwd = self.forward_gru.forward(inputs)
+        # Reverse the input time axis for backward pass and reverse the output to align with h_fwd
+        h_bwd = self.backward_gru.forward(inputs[:, ::-1, :])[:, ::-1, :]
+
+        h_combined = np.concatenate([h_fwd, h_bwd], axis=-1)
+        return h_combined
+    
+    def backward(self, grad_output):
+        batch_size, seq_len, _ = grad_output.shape
+        half_hidden_dim = self.hidden_dim
+
+        d_h_fwd = grad_output[:, :, :half_hidden_dim]
+        d_h_bwd = grad_output[:, :, half_hidden_dim:]
+
+        d_inputs_fwd, d_initial_hidden_fwd = self.forward_gru.backward(d_h_fwd)
+        # Reverse the gradient time axis for backward GRU
+        d_h_bwd_reversed = d_h_bwd[:, ::-1, :]
+        d_inputs_bwd_reversed, d_initial_hidden_bwd = self.backward_gru.backward(d_h_bwd_reversed)
+        d_inputs_bwd = d_inputs_bwd_reversed[:, ::-1, :]
+
+        d_inputs = d_inputs_fwd + d_inputs_bwd
+        return d_inputs, d_initial_hidden_fwd, d_initial_hidden_bwd 
+
 
 class Encoder(object):
     def __init__(self, vocab_size, embed_dim, hidden_dim):
         self.embedding = Embedding(vocab_size, embed_dim)
-        self.gru = GRULayer(embed_dim, hidden_dim)
+        self.gru = BidirectionalGRULayer(embed_dim, hidden_dim)
         
         self.gru_outputs_shape = None
 
@@ -162,8 +192,14 @@ class Encoder(object):
 
     def backward(self, grad_output):
         full_grad_tensor = np.zeros(self.gru_outputs_shape)
-        full_grad_tensor[:, -1, :] = grad_output
-        d_embedded, _ = self.gru.backward(full_grad_tensor)
+        # Split grad_output for forward and backward GRU layers 
+        grad_fwd = grad_output[:, :self.gru.hidden_dim]
+        grad_bwd = grad_output[:, self.gru.hidden_dim:]
+
+        full_grad_tensor[:, -1, :self.gru.hidden_dim] = grad_fwd # Last time step for forward GRU
+        full_grad_tensor[:, 0, self.gru.hidden_dim:] = grad_bwd # First time step for backward GRU 
+
+        d_embedded, _, _ = self.gru.backward(full_grad_tensor)
         self.embedding.backward(d_embedded)
         return None
 
@@ -202,13 +238,14 @@ class LinearLayer(object):
 class Decoder(object):
     def __init__(self, vocab_size, embed_dim, hidden_dim):
         self.embedding = Embedding(vocab_size, embed_dim)
-        self.gru = GRULayer(embed_dim, hidden_dim)
-        self.fc = LinearLayer(hidden_dim, vocab_size)
+        self.gru = GRULayer(embed_dim, hidden_dim * 2) # to match encoder dims
+        self.fc = LinearLayer(hidden_dim * 2, vocab_size)
 
-    def forward(self, input_ids, hidden):
+    def forward(self, input_ids, context_vector):
         embedded = self.embedding.forward(input_ids)
-        outputs = self.gru.forward(embedded, hidden)
-        logits = self.fc.forward(outputs)
+        # Use context vector as initial hidden state
+        gru_outputs = self.gru.forward(embedded, initial_hidden=context_vector)
+        logits = self.fc.forward(gru_outputs)
         return logits
 
     def backward(self, grad_output):
@@ -216,21 +253,3 @@ class Decoder(object):
         d_embedded, d_hidden = self.gru.backward(d_outputs)
         self.embedding.backward(d_embedded)
         return d_hidden
-
-
-if __name__ == "__main__":
-    vocab_size = 100
-    embed_dim = 64
-    hidden_dim = 128
-    batch_size = 32
-    seq_len = 10
-
-    encoder = Encoder(vocab_size, embed_dim, hidden_dim)
-    input_ids = np.random.randint(0, vocab_size, (batch_size, seq_len))
-    hidden = encoder.forward(input_ids)
-    print("Encoder output shape:", hidden.shape)  # Should be (batch_size, seq_len, hidden_dim)
-
-    decoder = Decoder(vocab_size, embed_dim, hidden_dim)
-    tgt_input_ids = np.random.randint(0, vocab_size, (batch_size, seq_len))
-    logits = decoder.forward(tgt_input_ids, hidden[:, -1, :])
-    print("Decoder output shape:", logits.shape)  # Should be (batch_size, seq_len, vocab_size)

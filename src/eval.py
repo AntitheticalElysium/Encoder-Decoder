@@ -1,6 +1,6 @@
-import numpy as np
+import cupy as np
 import pickle
-from src.models.rnn_seq2seq import Encoder, Decoder
+from src.train import model_to_gpu
 from src.vocab import Vocab
 
 def translate_sentence(sentence, encoder, decoder, vocab_src, vocab_tgt, max_len=10):
@@ -49,6 +49,9 @@ if __name__ == '__main__':
     with open('models/decoder.pkl', 'rb') as f:
         decoder = pickle.load(f)
         
+    all_learnable_layers = [encoder.embedding, encoder.gru.gru_cell, decoder.embedding, decoder.gru.gru_cell, decoder.fc]
+    model_to_gpu(all_learnable_layers)
+
     vocab_src = Vocab.load('data/vocab_src.json')
     vocab_tgt = Vocab.load('data/vocab_tgt.json')
 
