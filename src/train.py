@@ -1,4 +1,5 @@
 import numpy as np
+import random 
 import pickle
 from src.vocab import Vocab
 from src.utils import sigmoid, softmax, CrossEntropyLoss
@@ -49,12 +50,16 @@ if __name__ == '__main__':
     with open('data/preprocessed_data.pkl', 'rb') as f:
         data = pickle.load(f)
 
+    all_indices = list(range(len(data['src_ids'])))
+    random.shuffle(all_indices)
+    sample_indices = all_indices[:50000]
     # Smaller dataset for quicker debugging
-    src_ids_list = data['src_ids'][:1000]
-    tgt_input_ids_list = data['tgt_input_ids'][:1000]
-    tgt_output_ids_list = data['tgt_output_ids'][:1000]
+    src_ids_list = [data['src_ids'][i] for i in sample_indices]
+    tgt_input_ids_list = [data['tgt_input_ids'][i] for i in sample_indices]
+    tgt_output_ids_list = [data['tgt_output_ids'][i] for i in sample_indices]
     vocab_src = data['vocab_src']
     vocab_tgt = data['vocab_tgt']
+
 
     print(f'Loaded {len(src_ids_list)} training samples.')
 
@@ -63,11 +68,11 @@ if __name__ == '__main__':
     vocab_size_tgt = len(vocab_tgt)
 
     # Hyperparams
-    embed_dim = 64
-    hidden_dim = 128
-    batch_size = 32 
-    num_epochs = 1000
-    learning_rate = 0.01
+    embed_dim = 128
+    hidden_dim = 256
+    batch_size = 64
+    num_iterations = 500
+    learning_rate = 0.001
 
     encoder = Encoder(vocab_size_src, embed_dim, hidden_dim)
     decoder = Decoder(vocab_size_tgt, embed_dim, hidden_dim)
@@ -75,9 +80,10 @@ if __name__ == '__main__':
 
     learnable_layers = [encoder.embedding, encoder.gru.gru_cell, decoder.embedding, decoder.gru.gru_cell, decoder.fc]
     optimizer = SGD(layers=learnable_layers, learning_rate=learning_rate)
-    
+
+    best_loss = float('inf')
     print('Starting training...')
-    for i in range(num_epochs):
+    for i in range(num_iterations):
         input_seq, decoder_src, decoder_tgt = get_batch(src_ids_list, tgt_input_ids_list, tgt_output_ids_list, batch_size, pad_idx)
         # Grads to zero
         optimizer.zero_grad()
@@ -90,7 +96,15 @@ if __name__ == '__main__':
         loss = criterion.forward(logits, decoder_tgt, pad_idx)
 
         if (i % 50 == 0):
-            print(f'Epoch {i}, Loss: {loss:.4f}')
+            if loss < best_loss:
+                best_loss = loss
+                with open('models/encoder.pkl', 'wb') as f:
+                    pickle.dump(encoder, f)
+                with open('models/decoder.pkl', 'wb') as f:
+                    pickle.dump(decoder, f)
+                print('New best model saved with loss {best_loss:.4f}')
+            else:
+                print(f'Iteration {i}, Loss: {loss:.4f}')
 
         # Backwards
         d_logits = criterion.backward()
