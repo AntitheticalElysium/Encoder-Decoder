@@ -178,28 +178,40 @@ class BidirectionalGRULayer(object):
 
 
 class Encoder(object):
-    def __init__(self, vocab_size, embed_dim, hidden_dim):
+    def __init__(self, vocab_size, embed_dim, hidden_dim, num_layers):
         self.embedding = Embedding(vocab_size, embed_dim)
-        self.gru = BidirectionalGRULayer(embed_dim, hidden_dim)
-        
-        self.gru_outputs_shape = None
+        self.layers = []
+
+        self.layers.append(BidirectionalGRULayer(embed_dim, hidden_dim))
+        for _ in range(1, num_layers):
+            self.layers.append(BidirectionalGRULayer(hidden_dim * 2, hidden_dim))
+
+        self.layers_outputs_shape = None
 
     def forward(self, input_ids):
         embedded = self.embedding.forward(input_ids)
-        hidden = self.gru.forward(embedded)
-        self.gru_outputs_shape = hidden.shape
-        return hidden
+        for layer in self.layers:
+            embedded = layer.forward(embedded)
+        self.layers_outputs_shape = embedded.shape
+        return embedded
 
-    def backward(self, grad_output):
-        full_grad_tensor = np.zeros(self.gru_outputs_shape)
-        # Split grad_output for forward and backward GRU layers 
-        grad_fwd = grad_output[:, :self.gru.hidden_dim]
-        grad_bwd = grad_output[:, self.gru.hidden_dim:]
+    def backward(self, d_context_vect):
+        d_encoder_hidden = np.zeros(self.layers_outputs_shape)
+        hidden_dim = self.layers[-1].hidden_dim # hidden_dim per direction
 
-        full_grad_tensor[:, -1, :self.gru.hidden_dim] = grad_fwd # Last time step for forward GRU
-        full_grad_tensor[:, 0, self.gru.hidden_dim:] = grad_bwd # First time step for backward GRU 
+        d_last_fwd = d_context_vect[:, :hidden_dim]
+        d_first_bwd = d_context_vect[:, hidden_dim:]
 
-        d_embedded, _, _ = self.gru.backward(full_grad_tensor)
+        # grad for the last forward state
+        d_encoder_hidden[:, -1, :hidden_dim] = d_last_fwd
+        # grad for the first backward state (at time step 0)
+        d_encoder_hidden[:, 0, hidden_dim:] = d_first_bwd
+
+        d_next_input = d_encoder_hidden
+        for layer in reversed(self.layers):
+            d_next_input, _, _ = layer.backward(d_next_input)
+
+        d_embedded = d_next_input
         self.embedding.backward(d_embedded)
         return None
 
@@ -236,20 +248,42 @@ class LinearLayer(object):
 
 
 class Decoder(object):
-    def __init__(self, vocab_size, embed_dim, hidden_dim):
+    def __init__(self, vocab_size, embed_dim, hidden_dim, num_layers):
         self.embedding = Embedding(vocab_size, embed_dim)
-        self.gru = GRULayer(embed_dim, hidden_dim * 2) # to match encoder dims
+        self.layers = []
+        # Adapt context vect size to decoder hidden size
+        self.layers.append(GRULayer(embed_dim, hidden_dim * 2))
+        for _ in range(1, num_layers):
+            self.layers.append(GRULayer(hidden_dim * 2, hidden_dim * 2))
+
         self.fc = LinearLayer(hidden_dim * 2, vocab_size)
 
     def forward(self, input_ids, context_vector):
-        embedded = self.embedding.forward(input_ids)
-        # Use context vector as initial hidden state
-        gru_outputs = self.gru.forward(embedded, initial_hidden=context_vector)
-        logits = self.fc.forward(gru_outputs)
+        layer_input = self.embedding.forward(input_ids)
+        # Use the context_vector as the initial hidden state for the first  layer.
+        layer_output = self.layers[0].forward(layer_input, initial_hidden=context_vector)
+        layer_input = layer_output
+
+        for i in range(1, len(self.layers)):
+            layer_output = self.layers[i].forward(layer_input, initial_hidden=None) # None to use zero state
+            layer_input = layer_output
+
+        logits = self.fc.forward(layer_input)
         return logits
 
     def backward(self, grad_output):
-        d_outputs = self.fc.backward(grad_output)
-        d_embedded, d_hidden = self.gru.backward(d_outputs)
+        d_layer_output = self.fc.backward(grad_output)
+        d_initial_hidden_for_encoder = None
+    
+        for i in reversed(range(len(self.layers))):
+            layer = self.layers[i]
+            # d_layer_input becomes the d_layer_output for the layer below
+            d_layer_input, d_initial_hidden = layer.backward(d_layer_output)
+            # We only care about the gradient of the initial hidden state for the first layer from the encoder.
+            if i == 0:
+                d_initial_hidden_for_encoder = d_initial_hidden
+            d_layer_output = d_layer_input
+
+        d_embedded = d_layer_output
         self.embedding.backward(d_embedded)
-        return d_hidden
+        return d_initial_hidden_for_encoder

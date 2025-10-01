@@ -110,24 +110,26 @@ if __name__ == '__main__':
     vocab_size_tgt = len(vocab_tgt)
 
     embed_dim = 256
-    hidden_dim = 512
+    hidden_dim = 256
     batch_size = 64
-    num_iterations = 20000
-    learning_rate = 0.001
-    clip_value = 5.0
+    num_iterations = 3000
+    learning_rate = 0.005
+    clip_value = 1.0
 
-    encoder = Encoder(vocab_size_src, embed_dim, hidden_dim)
-    decoder = Decoder(vocab_size_tgt, embed_dim, hidden_dim)
+    encoder = Encoder(vocab_size_src, embed_dim, hidden_dim, 2)
+    decoder = Decoder(vocab_size_tgt, embed_dim, hidden_dim, 2)
     criterion = CrossEntropyLoss()
 
     all_learnable_layers = [
-        encoder.embedding, 
-        encoder.gru.forward_gru.gru_cell,
-        encoder.gru.backward_gru.gru_cell,
-        decoder.embedding, 
-        decoder.gru.gru_cell, 
+        encoder.embedding,
+        decoder.embedding,
         decoder.fc
     ]
+    for layer in encoder.layers:
+        all_learnable_layers.append(layer.forward_gru.gru_cell)
+        all_learnable_layers.append(layer.backward_gru.gru_cell)
+    for layer in decoder.layers:
+        all_learnable_layers.append(layer.gru_cell)
     optimizer = SGD(layers=all_learnable_layers, learning_rate=learning_rate, clip_value=clip_value)
 
     best_loss = float('inf')

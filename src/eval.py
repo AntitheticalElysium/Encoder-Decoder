@@ -43,20 +43,22 @@ def translate_sentence(sentence, encoder, decoder, vocab_src, vocab_tgt, max_len
 
 
 if __name__ == '__main__':
-    print("--- Loading models and vocabularies ---")
+    print("Loading models and vocabularies")
     with open('models/encoder.pkl', 'rb') as f:
         encoder = pickle.load(f)
     with open('models/decoder.pkl', 'rb') as f:
         decoder = pickle.load(f)
         
     all_learnable_layers = [
-        encoder.embedding, 
-        encoder.gru.forward_gru.gru_cell,
-        encoder.gru.backward_gru.gru_cell,
-        decoder.embedding, 
-        decoder.gru.gru_cell, 
+        encoder.embedding,
+        decoder.embedding,
         decoder.fc
     ]
+    for layer in encoder.layers:
+        all_learnable_layers.append(layer.forward_gru.gru_cell)
+        all_learnable_layers.append(layer.backward_gru.gru_cell)
+    for layer in decoder.layers:
+        all_learnable_layers.append(layer.gru_cell)
     model_to_gpu(all_learnable_layers)
 
     vocab_src = Vocab.load('data/vocab_src.json')
@@ -70,7 +72,7 @@ if __name__ == '__main__':
         "she is very smart ."
     ]
 
-    print("\n--- Starting Translation ---")
+    print("\nStarting Translation")
     for phrase in test_phrases:
         translation = translate_sentence(phrase, encoder, decoder, vocab_src, vocab_tgt)
         print(f"English Input:  {phrase}")
