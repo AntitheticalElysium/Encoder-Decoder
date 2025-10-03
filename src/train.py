@@ -6,83 +6,8 @@ import pickle
 from src.vocab import Vocab
 from src.utils import sigmoid, softmax, CrossEntropyLoss 
 from src.models.rnn_seq2seq import Encoder, Decoder, Embedding, GRUCell, GRULayer, LinearLayer
-
-class SGD(object):
-    def __init__(self, layers, learning_rate=0.01, clip_value=5.0):
-        self.layers = layers
-        self.learning_rate = learning_rate
-        self.clip_value = clip_value
-
-    def _get_params_and_grads(self):
-        for layer in self.layers:
-            if hasattr(layer, 'params'):
-                for key in layer.params:
-                    param = getattr(layer, key)
-                    grad = getattr(layer, 'd_' + key)
-                    yield param, grad
-
-    def step(self):
-        total_norm = 0
-        for _, grad in self._get_params_and_grads():
-            total_norm += np.sum(grad**2)
-        total_norm = np.sqrt(total_norm)
-        
-        clip_coef = self.clip_value / (total_norm + 1e-6)
-
-        for param, grad in self._get_params_and_grads():
-            if clip_coef < 1:
-                grad *= clip_coef
-            param -= self.learning_rate * grad
-
-    def zero_grad(self):
-        for _, grad in self._get_params_and_grads():
-            grad.fill(0)
-
-def get_batch(src_ids_list, tgt_input_ids_list, tgt_output_ids_list, batch_size, pad_idx):
-    num_samples = len(src_ids_list)
-    indices = host_np.random.choice(num_samples, batch_size, replace=False)
-
-    batch_src = [src_ids_list[i] for i in indices]
-    batch_tgt_in = [tgt_input_ids_list[i] for i in indices]
-    batch_tgt_out = [tgt_output_ids_list[i] for i in indices]
-
-    max_len_src = max(len(s) for s in batch_src)
-    max_len_tgt = max(len(t) for t in batch_tgt_in)
-
-    padded_src = host_np.full((batch_size, max_len_src), pad_idx, dtype=host_np.int32)
-    padded_tgt_in = host_np.full((batch_size, max_len_tgt), pad_idx, dtype=host_np.int32)
-    padded_tgt_out = host_np.full((batch_size, max_len_tgt), pad_idx, dtype=host_np.int32)
-
-    for i in range(batch_size):
-        padded_src[i, :len(batch_src[i])] = batch_src[i]
-        padded_tgt_in[i, :len(batch_tgt_in[i])] = batch_tgt_in[i]
-        padded_tgt_out[i, :len(batch_tgt_out[i])] = batch_tgt_out[i]
-
-    return padded_src, padded_tgt_in, padded_tgt_out
-
-def model_to_cpu(model_layers):
-    for layer in model_layers:
-        if hasattr(layer, 'params'):
-            for param_name in layer.params:
-                gpu_param = getattr(layer, param_name)
-                setattr(layer, param_name, gpu_param.get())
-                
-                grad_name = 'd_' + param_name
-                gpu_grad = getattr(layer, grad_name)
-                setattr(layer, grad_name, gpu_grad.get())
-
-
-def model_to_gpu(model_layers):
-    for layer in model_layers:
-        if hasattr(layer, 'params'):
-            for param_name in layer.params:
-                cpu_param = getattr(layer, param_name)
-                setattr(layer, param_name, np.asarray(cpu_param))
-
-                grad_name = 'd_' + param_name
-                cpu_grad = getattr(layer, grad_name)
-                setattr(layer, grad_name, np.asarray(cpu_grad))
-
+from src.optimizer import SGD, Adam
+from src.utils import get_batch, model_to_cpu, model_to_gpu
 
 if __name__ == '__main__':
     seed = 42
@@ -113,7 +38,7 @@ if __name__ == '__main__':
     hidden_dim = 256
     batch_size = 64
     num_iterations = 3000
-    learning_rate = 0.005
+    learning_rate = 0.001
     clip_value = 1.0
 
     encoder = Encoder(vocab_size_src, embed_dim, hidden_dim, 2)
@@ -130,7 +55,8 @@ if __name__ == '__main__':
         all_learnable_layers.append(layer.backward_gru.gru_cell)
     for layer in decoder.layers:
         all_learnable_layers.append(layer.gru_cell)
-    optimizer = SGD(layers=all_learnable_layers, learning_rate=learning_rate, clip_value=clip_value)
+    #optimizer = SGD(layers=all_learnable_layers, learning_rate=learning_rate, clip_value=clip_value)
+    optimizer = Adam(layers=all_learnable_layers, learning_rate=learning_rate, clip_value=clip_value)
 
     best_loss = float('inf')
     print('Starting training on GPU...')

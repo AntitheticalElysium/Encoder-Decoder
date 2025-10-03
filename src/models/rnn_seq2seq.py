@@ -1,11 +1,11 @@
 import cupy as np
-from src.utils import sigmoid, softmax
+from src.utils import sigmoid, softmax, xavier_init
 
 class Embedding(object):
     def __init__(self, vocab_size, embed_dim):
         self.vocab_size = vocab_size
         self.embed_dim = embed_dim
-        self.weights = np.random.uniform(-0.1, 0.1, (vocab_size, embed_dim))
+        self.weights = xavier_init(vocab_size, embed_dim)
 
         self.d_weights = np.zeros_like(self.weights)
 
@@ -30,16 +30,16 @@ class GRUCell(object):
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
         # Update gate parameters (how much of old mem to keep)
-        self.W_z = np.random.uniform(-0.1, 0.1, (input_dim, hidden_dim))
-        self.U_z = np.random.uniform(-0.1, 0.1, (hidden_dim, hidden_dim))
+        self.W_z = xavier_init(input_dim, hidden_dim)
+        self.U_z = xavier_init(hidden_dim, hidden_dim)
         self.b_z = np.zeros(hidden_dim)
         # Reset gate parameters (how much of old mem to forget)
-        self.W_r = np.random.uniform(-0.1, 0.1, (input_dim, hidden_dim))
-        self.U_r = np.random.uniform(-0.1, 0.1, (hidden_dim, hidden_dim))
+        self.W_r = xavier_init(input_dim, hidden_dim)
+        self.U_r = xavier_init(hidden_dim, hidden_dim)
         self.b_r = np.zeros(hidden_dim)
-        # New memory content parameters 
-        self.W_h = np.random.uniform(-0.1, 0.1, (input_dim, hidden_dim))
-        self.U_h = np.random.uniform(-0.1, 0.1, (hidden_dim, hidden_dim))
+        # New memory content parameters
+        self.W_h = xavier_init(input_dim, hidden_dim)
+        self.U_h = xavier_init(hidden_dim, hidden_dim)
         self.b_h = np.zeros(hidden_dim)
 
         self.d_W_z, self.d_U_z, self.d_b_z = [np.zeros_like(p) for p in [self.W_z, self.U_z, self.b_z]]
@@ -60,6 +60,7 @@ class GRUCell(object):
         r_t = sigmoid(np.dot(x_t, self.W_r) + np.dot(h_prev, self.U_r) + self.b_r)
 
         h_tilde = np.tanh(np.dot(x_t, self.W_h) + np.dot(r_t * h_prev, self.U_h) + self.b_h)
+        #h_t = z_t * h_prev + (1 - z_t) * h_tilde
         h_t = (1 - z_t) * h_prev + z_t * h_tilde
 
         self.cache = {'x_t': x_t, 'h_prev': h_prev, 'z_t': z_t, 'r_t': r_t, 'h_tilde': h_tilde}

@@ -24,7 +24,9 @@ def translate_sentence(sentence, encoder, decoder, vocab_src, vocab_tgt, max_len
 
     for _ in range(max_len):
         embedded = decoder.embedding.forward(decoder_input)
-        decoder_gru_outputs = decoder.gru.forward(embedded, decoder_hidden)
+        for layer in decoder.layers:
+            decoder_gru_outputs = layer.gru_cell.forward(embedded, decoder_hidden)
+            embedded = decoder_gru_outputs
         logits = decoder.fc.forward(decoder_gru_outputs)
         
         predicted_id = np.argmax(logits, axis=-1).item()
