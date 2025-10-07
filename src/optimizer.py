@@ -85,7 +85,6 @@ class Adam(object):
                     yield layer, key, param, grad
 
     def step(self):
-        """Perform one optimization step using Adam update rule"""
         self.t += 1
         params_grads = list(self._get_params_and_grads())
         
@@ -117,7 +116,6 @@ class Adam(object):
             param -= self.learning_rate * m_hat / (cp.sqrt(v_hat) + self.epsilon)
 
     def zero_grad(self):
-        """Reset all gradients to zero"""
         for layer in self.layers:
             if hasattr(layer, 'params'):
                 for key in layer.params:
