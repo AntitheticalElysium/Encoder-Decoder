@@ -13,8 +13,8 @@ class Vocab(object):
             if freq < min_freq:
                 continue
             if tok not in self.stoi:
-                self.itos.append(tok)
                 self.stoi[tok] = len(self.itos)
+                self.itos.append(tok)
         
     def encode(self, tokens):
         return [self.stoi.get(tok, self.stoi["<unk>"]) for tok in tokens]

@@ -16,27 +16,30 @@ def translate_sentence(sentence, encoder, decoder, vocab_src, vocab_tgt, max_len
     src_tensor = np.array(token_ids).reshape(1, -1)
 
     encoder_hidden_states = encoder.forward(src_tensor)
-    context_vector = encoder_hidden_states[:, -1, :]
+    
+    # Extract context vector from bidirectional encoder (same as training)
+    hidden_dim = encoder.layers[-1].hidden_dim
+    last_fwd = encoder_hidden_states[:, -1, :hidden_dim]
+    first_bwd = encoder_hidden_states[:, 0, hidden_dim:]
+    context_vector = np.concatenate([last_fwd, first_bwd], axis=-1)
 
     translated_token_ids = []
-    decoder_input = np.array([vocab_tgt.stoi['<sos>']]).reshape(1, 1)
-    decoder_hidden = context_vector
+    # Start with <sos> token
+    generated_ids = [vocab_tgt.stoi['<sos>']]
 
     for _ in range(max_len):
-        embedded = decoder.embedding.forward(decoder_input)
-        decoder_gru_outputs = decoder.gru.forward(embedded, decoder_hidden)
-        logits = decoder.fc.forward(decoder_gru_outputs)
+        # Pass the full sequence generated so far
+        decoder_input = np.array(generated_ids).reshape(1, -1)
+        logits = decoder.forward(decoder_input, context_vector)
         
-        predicted_id = np.argmax(logits, axis=-1).item()
-
-        decoder_hidden = decoder_gru_outputs[:, -1, :]
+        # Get the last time step's logits
+        predicted_id = np.argmax(logits[:, -1, :], axis=-1).item()
 
         if predicted_id == vocab_tgt.stoi['<eos>']:
             break
             
         translated_token_ids.append(predicted_id)
-
-        decoder_input = np.array([predicted_id]).reshape(1, 1)
+        generated_ids.append(predicted_id)
 
     translated_sentence = " ".join(vocab_tgt.decode(translated_token_ids, skip_special_tokens=True))
     return translated_sentence

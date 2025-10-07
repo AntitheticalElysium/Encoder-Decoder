@@ -1,7 +1,12 @@
 import cupy as np
 
 def sigmoid(x):
-    return 1 / (1 + np.exp(-x))
+    # Numerically stable sigmoid
+    return np.where(
+        x >= 0,
+        1 / (1 + np.exp(-x)),
+        np.exp(x) / (1 + np.exp(x))
+    )
 
 def softmax(x):
     e_x = np.exp(x - np.max(x, axis=-1, keepdims=True)) # For numerical stability
@@ -39,11 +44,12 @@ class CrossEntropyLoss(object):
         # create one-hot encoded targets for the non-padded tokens
         num_masked_samples = self.probs.shape[0]
         masked_targets = self.targets_flat[self.mask]
+        batch_size = self.original_shape[0]
         
         one_hot_targets = np.zeros_like(self.probs)
         one_hot_targets[np.arange(num_masked_samples), masked_targets] = 1
         
-        d_masked_logits = self.probs - one_hot_targets
+        d_masked_logits = (self.probs - one_hot_targets) / batch_size
         d_logits_flat = np.zeros((self.targets_flat.shape[0], self.vocab_size))
         d_logits_flat[self.mask] = d_masked_logits
         

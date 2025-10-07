@@ -37,6 +37,10 @@ class SGD(object):
     def zero_grad(self):
         for _, grad in self._get_params_and_grads():
             grad.fill(0)
+        # Also reset gradients in GRU cells
+        for layer in self.layers:
+            if hasattr(layer, 'zero_grad'):
+                layer.zero_grad()
 
 def get_batch(src_ids_list, tgt_input_ids_list, tgt_output_ids_list, batch_size, pad_idx):
     num_samples = len(src_ids_list)

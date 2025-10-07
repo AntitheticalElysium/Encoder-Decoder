@@ -65,6 +65,18 @@ class GRUCell(object):
         self.cache = {'x_t': x_t, 'h_prev': h_prev, 'z_t': z_t, 'r_t': r_t, 'h_tilde': h_tilde}
         return h_t
 
+    def zero_grad(self):
+        """Reset all gradients to zero"""
+        self.d_W_z.fill(0)
+        self.d_U_z.fill(0)
+        self.d_b_z.fill(0)
+        self.d_W_r.fill(0)
+        self.d_U_r.fill(0)
+        self.d_b_r.fill(0)
+        self.d_W_h.fill(0)
+        self.d_U_h.fill(0)
+        self.d_b_h.fill(0)
+
     def backward(self, grad_output):
         x_t, h_prev, z_t, r_t, h_tilde = self.cache.values()
         
@@ -108,6 +120,10 @@ class GRULayer(object):
         self.gru_cell = GRUCell(input_dim, hidden_dim)
 
         self.caches = []
+    
+    @property
+    def params(self):
+        return self.gru_cell.params
 
     def forward(self, inputs, initial_hidden=None):
         batch_size, seq_len, _ = inputs.shape
@@ -124,7 +140,7 @@ class GRULayer(object):
             x_t = inputs[:, t, :]
             h_t = self.gru_cell.forward(x_t, h_t)
             hidden_states.append(h_t)
-            self.caches.append(self.gru_cell.cache)
+            self.caches.append(self.gru_cell.cache.copy())
 
         return np.stack(hidden_states, axis=1) # Stack of all hidden states
 
@@ -151,6 +167,16 @@ class BidirectionalGRULayer(object):
         self.hidden_dim = hidden_dim
         self.forward_gru = GRULayer(input_dim, hidden_dim)
         self.backward_gru = GRULayer(input_dim, hidden_dim)
+
+    @property
+    def params(self):
+        # Combine params from both directions
+        combined_params = {}
+        for key, value in self.forward_gru.params.items():
+            combined_params[f'fwd_{key}'] = value
+        for key, value in self.backward_gru.params.items():
+            combined_params[f'bwd_{key}'] = value
+        return combined_params
 
     def forward(self, inputs):
         h_fwd = self.forward_gru.forward(inputs)
@@ -187,6 +213,13 @@ class Encoder(object):
             self.layers.append(BidirectionalGRULayer(hidden_dim * 2, hidden_dim))
 
         self.layers_outputs_shape = None
+
+    @property
+    def params(self):
+        combined_params = {'embedding': self.embedding.params}
+        for i, layer in enumerate(self.layers):
+            combined_params[f'layer_{i}'] = layer.params
+        return combined_params
 
     def forward(self, input_ids):
         embedded = self.embedding.forward(input_ids)
@@ -239,8 +272,8 @@ class LinearLayer(object):
         input_flat = self.input.reshape(-1, self.input.shape[-1])
         grad_output_flat = grad_output.reshape(-1, grad_output.shape[-1])
 
-        self.d_weights = np.dot(input_flat.T, grad_output_flat)
-        self.d_bias = np.sum(grad_output_flat, axis=0)
+        self.d_weights += np.dot(input_flat.T, grad_output_flat)
+        self.d_bias += np.sum(grad_output_flat, axis=0)
         
         d_input_flat = np.dot(grad_output_flat, self.weights.T)
         d_input = d_input_flat.reshape(self.input.shape)
@@ -257,6 +290,16 @@ class Decoder(object):
             self.layers.append(GRULayer(hidden_dim * 2, hidden_dim * 2))
 
         self.fc = LinearLayer(hidden_dim * 2, vocab_size)
+
+    @property
+    def params(self):
+        combined_params = {
+            'embedding': self.embedding.params,
+            'fc': self.fc.params
+        }
+        for i, layer in enumerate(self.layers):
+            combined_params[f'layer_{i}'] = layer.params
+        return combined_params
 
     def forward(self, input_ids, context_vector):
         layer_input = self.embedding.forward(input_ids)
