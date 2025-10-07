@@ -1,0 +1,11 @@
+Loaded 50000 training samples.
+Starting training on GPU...
+Config: embed_dim=256, hidden_dim=256, batch_size=64
+        lr=0.001, clip=5.0, iterations=10000
+        vocab_src=14343, vocab_tgt=28692
+Iteration 0/10000, Loss: 10.2616, Grad Norm: 0.0000
+  -> New best loss. Saving model.
+Iteration 100/10000, Loss: 10.2341, Grad Norm: 0.0000
+  -> New best loss. Saving model.
+Iteration 200/10000, Loss: 10.2131, Grad Norm: 0.0000
+  -> New best loss. Saving model.

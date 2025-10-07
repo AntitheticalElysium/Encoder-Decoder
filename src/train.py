@@ -37,9 +37,9 @@ if __name__ == '__main__':
     embed_dim = 256
     hidden_dim = 256
     batch_size = 64
-    num_iterations = 3000
-    learning_rate = 0.005
-    clip_value = 1.0
+    num_iterations = 10000  # Increased for better convergence
+    learning_rate = 0.001  # Reduced for stability
+    clip_value = 5.0  # Less aggressive clipping
 
     # Create Seq2Seq model
     model = Seq2Seq.create(vocab_size_src, vocab_size_tgt, embed_dim, hidden_dim, num_layers=2)
@@ -51,12 +51,16 @@ if __name__ == '__main__':
 
     best_loss = float('inf')
     print('Starting training on GPU...')
+    print(f'Config: embed_dim={embed_dim}, hidden_dim={hidden_dim}, batch_size={batch_size}')
+    print(f'        lr={learning_rate}, clip={clip_value}, iterations={num_iterations}')
+    print(f'        vocab_src={vocab_size_src}, vocab_tgt={vocab_size_tgt}')
     for i in range(num_iterations):
         input_cpu, dec_in_cpu, dec_tgt_cpu = get_batch(src_ids_list, tgt_input_ids_list, tgt_output_ids_list, batch_size, pad_idx)
         
-        input_seq = np.asarray(input_cpu)
-        decoder_src = np.asarray(dec_in_cpu)
-        decoder_tgt = np.asarray(dec_tgt_cpu)
+        # Convert to CuPy arrays (GPU)
+        input_seq = cp.asarray(input_cpu)
+        decoder_src = cp.asarray(dec_in_cpu)
+        decoder_tgt = cp.asarray(dec_tgt_cpu)
         
         optimizer.zero_grad()
 
@@ -67,7 +71,16 @@ if __name__ == '__main__':
         loss_cpu = loss_gpu.get()
 
         if i % 100 == 0:
-            print(f'Iteration {i}/{num_iterations}, Loss: {loss_cpu:.4f}')
+            # Calculate gradient norm for monitoring
+            grad_norm = 0
+            for layer in all_learnable_layers:
+                if hasattr(layer, 'params'):
+                    for key in layer.params:
+                        grad = getattr(layer, 'd_' + key)
+                        grad_norm += cp.sum(grad**2)
+            grad_norm = float(cp.sqrt(grad_norm).get())
+            
+            print(f'Iteration {i}/{num_iterations}, Loss: {loss_cpu:.4f}, Grad Norm: {grad_norm:.4f}')
             if loss_cpu < best_loss:
                 best_loss = loss_cpu
                 print(f'  -> New best loss. Saving model.')

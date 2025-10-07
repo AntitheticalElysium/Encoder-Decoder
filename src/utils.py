@@ -37,19 +37,20 @@ class CrossEntropyLoss(object):
         num_masked_samples = len(masked_targets)
         correct_logprobs = -cp.log(self.probs[cp.arange(num_masked_samples), masked_targets] + 1e-9)
         
-        loss = cp.sum(correct_logprobs) / batch_size
+        # Divide by number of non-padded tokens, not batch_size
+        loss = cp.sum(correct_logprobs) / num_masked_samples
         return loss
 
     def backward(self):
         # create one-hot encoded targets for the non-padded tokens
         num_masked_samples = self.probs.shape[0]
         masked_targets = self.targets_flat[self.mask]
-        batch_size = self.original_shape[0]
         
         one_hot_targets = cp.zeros_like(self.probs)
         one_hot_targets[cp.arange(num_masked_samples), masked_targets] = 1
         
-        d_masked_logits = (self.probs - one_hot_targets) / batch_size
+        # Divide by number of non-padded tokens to match forward pass
+        d_masked_logits = (self.probs - one_hot_targets) / num_masked_samples
         d_logits_flat = cp.zeros((self.targets_flat.shape[0], self.vocab_size))
         d_logits_flat[self.mask] = d_masked_logits
         
