@@ -20,7 +20,7 @@ if __name__ == '__main__':
 
     all_indices = list(range(len(data['src_ids'])))
     random.shuffle(all_indices)
-    sample_indices = all_indices[:50000]
+    sample_indices = all_indices[:100000]
 
     src_ids_list = [data['src_ids'][i] for i in sample_indices]
     tgt_input_ids_list = [data['tgt_input_ids'][i] for i in sample_indices]
@@ -54,7 +54,19 @@ if __name__ == '__main__':
     print(f'Config: embed_dim={embed_dim}, hidden_dim={hidden_dim}, batch_size={batch_size}')
     print(f'        lr={learning_rate}, clip={clip_value}, iterations={num_iterations}')
     print(f'        vocab_src={vocab_size_src}, vocab_tgt={vocab_size_tgt}')
+    print(f'        LR schedule: 0.001 (0-1500) -> 0.0005 (1500-5000) -> 0.0001 (5000+)')
     for i in range(num_iterations):
+        # Learning rate schedule to reduce oscillations
+        if i >= 5000:
+            current_lr = 0.0001
+        elif i >= 1500:
+            current_lr = 0.0005
+        else:
+            current_lr = learning_rate
+        
+        if optimizer.learning_rate != current_lr:
+            optimizer.learning_rate = current_lr
+            print(f'  -> Learning rate changed to {current_lr} at iteration {i}')
         input_cpu, dec_in_cpu, dec_tgt_cpu = get_batch(src_ids_list, tgt_input_ids_list, tgt_output_ids_list, batch_size, pad_idx)
         
         # Convert to CuPy arrays (GPU)
@@ -81,7 +93,9 @@ if __name__ == '__main__':
             grad_norm = float(cp.sqrt(grad_norm).get())
             
             print(f'Iteration {i}/{num_iterations}, Loss: {loss_cpu:.4f}, Grad Norm: {grad_norm:.4f}')
-            if loss_cpu < best_loss:
+            
+            # Only save every 1000 iterations to reduce I/O overhead
+            if loss_cpu < best_loss and i % 1000 == 0:
                 best_loss = loss_cpu
                 print(f'  -> New best loss. Saving model.')
                 
