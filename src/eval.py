@@ -9,7 +9,7 @@ if __name__ == '__main__':
     
     with open('models/seq2seq.pkl', 'rb') as f:
         model = pickle.load(f)
-    print("✓ Loaded Seq2Seq model from models/seq2seq.pkl")
+    print("Loaded Seq2Seq model from models/seq2seq.pkl")
         
     # Move model to GPU
     all_learnable_layers = model.get_all_params()

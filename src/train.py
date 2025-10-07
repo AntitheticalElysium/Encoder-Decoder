@@ -6,7 +6,7 @@ import pickle
 from src.vocab import Vocab
 from src.utils import CrossEntropyLoss, get_batch, model_to_cpu, model_to_gpu
 from src.models import Seq2Seq
-from src.optimizer import SGD
+from src.optimizer import SGD,Adam
 
 
 if __name__ == '__main__':
@@ -47,12 +47,12 @@ if __name__ == '__main__':
 
     # Get all learnable parameters
     all_learnable_layers = model.get_all_params()
-    optimizer = SGD(layers=all_learnable_layers, learning_rate=learning_rate, clip_value=clip_value)
+    optimizer = Adam(layers=all_learnable_layers, learning_rate=learning_rate, clip_value=clip_value)
 
     best_loss = float('inf')
     print('Starting training on GPU...')
     print(f'Config: embed_dim={embed_dim}, hidden_dim={hidden_dim}, batch_size={batch_size}')
-    print(f'        lr={learning_rate}, clip={clip_value}, iterations={num_iterations}')
+    print(f'        optimizer=Adam, lr={learning_rate}, clip={clip_value}, iterations={num_iterations}')
     print(f'        vocab_src={vocab_size_src}, vocab_tgt={vocab_size_tgt}')
     print(f'        LR schedule: 0.001 (0-1500) -> 0.0005 (1500-5000) -> 0.0001 (5000+)')
     for i in range(num_iterations):
