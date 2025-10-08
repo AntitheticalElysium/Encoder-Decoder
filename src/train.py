@@ -20,7 +20,7 @@ if __name__ == '__main__':
 
     all_indices = list(range(len(data['src_ids'])))
     random.shuffle(all_indices)
-    sample_indices = all_indices[:100000]
+    sample_indices = all_indices[:]
 
     src_ids_list = [data['src_ids'][i] for i in sample_indices]
     tgt_input_ids_list = [data['tgt_input_ids'][i] for i in sample_indices]
@@ -69,7 +69,7 @@ if __name__ == '__main__':
             print(f'  -> Learning rate changed to {current_lr} at iteration {i}')
         input_cpu, dec_in_cpu, dec_tgt_cpu = get_batch(src_ids_list, tgt_input_ids_list, tgt_output_ids_list, batch_size, pad_idx)
         
-        # Convert to CuPy arrays (GPU)
+        # Convert to CuPy arrays
         input_seq = cp.asarray(input_cpu)
         decoder_src = cp.asarray(dec_in_cpu)
         decoder_tgt = cp.asarray(dec_tgt_cpu)

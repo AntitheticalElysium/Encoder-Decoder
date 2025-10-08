@@ -23,7 +23,8 @@ if __name__ == '__main__':
         "i am a student .",
         "this is a big house .",
         "we are driving a car .",
-        "she is very smart ."
+        "she is very smart .",
+        "the car is red and gold ."
     ]
 
     print("\nStarting Translation")
