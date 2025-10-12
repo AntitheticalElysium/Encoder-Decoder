@@ -37,9 +37,9 @@ if __name__ == '__main__':
     embed_dim = 256
     hidden_dim = 256
     batch_size = 64
-    num_iterations = 10000  # Increased for better convergence
-    learning_rate = 0.001  # Reduced for stability
-    clip_value = 5.0  # Less aggressive clipping
+    num_iterations = 10000
+    learning_rate = 0.001  
+    clip_value = 5.0
 
     # Create Seq2Seq model
     model = Seq2Seq.create(vocab_size_src, vocab_size_tgt, embed_dim, hidden_dim, num_layers=2)
@@ -57,10 +57,10 @@ if __name__ == '__main__':
     print(f'        LR schedule: 0.001 (0-1500) -> 0.0005 (1500-5000) -> 0.0001 (5000+)')
     for i in range(num_iterations):
         # Learning rate schedule to reduce oscillations
-        if i >= 5000:
-            current_lr = 0.0001
+        if i >= 3000:
+            current_lr = 0.00005
         elif i >= 1500:
-            current_lr = 0.0005
+            current_lr = 0.00025
         else:
             current_lr = learning_rate
         
