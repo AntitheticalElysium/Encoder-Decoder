@@ -32,19 +32,17 @@ class Encoder(object):
         self.layers_outputs_shape = embedded.shape
         return embedded
 
-    def backward(self, d_context_vect):
-        d_encoder_hidden = cp.zeros(self.layers_outputs_shape)
-        hidden_dim = self.layers[-1].hidden_dim # hidden_dim per direction
-
-        d_last_fwd = d_context_vect[:, :hidden_dim]
-        d_first_bwd = d_context_vect[:, hidden_dim:]
-
-        # grad for the last forward state
-        d_encoder_hidden[:, -1, :hidden_dim] = d_last_fwd
-        # grad for the first backward state (at time step 0)
-        d_encoder_hidden[:, 0, hidden_dim:] = d_first_bwd
-
-        d_next_input = d_encoder_hidden
+    def backward(self, d_encoder_states):
+        """
+        Backpropagate through encoder.
+        
+        Args:
+            d_encoder_states: Gradient w.r.t all encoder states (batch, seq_len, hidden_dim*2)
+        """
+        # With attention, gradient flows to ALL encoder states, not just context vector
+        d_next_input = d_encoder_states
+        
+        # Backprop through all encoder layers
         for layer in reversed(self.layers):
             d_next_input, _, _ = layer.backward(d_next_input)
 

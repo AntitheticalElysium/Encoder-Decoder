@@ -10,6 +10,9 @@ from src.optimizer import SGD,Adam
 
 
 if __name__ == '__main__':
+    # Clear GPU memory... 16G is rough....
+    cp.get_default_memory_pool().free_all_blocks()
+    
     seed = 42
     random.seed(seed)
     np.random.seed(seed)
@@ -35,14 +38,16 @@ if __name__ == '__main__':
     vocab_size_tgt = len(vocab_tgt)
 
     embed_dim = 384
-    hidden_dim = 384
-    batch_size = 64
+    hidden_dim = 384 
+    attention_dim = 128
+    num_layers = 2
+    batch_size = 32  
     num_iterations = 5000
     learning_rate = 0.001
     clip_value = 5.0
 
     # Create Seq2Seq model
-    model = Seq2Seq.create(vocab_size_src, vocab_size_tgt, embed_dim, hidden_dim, num_layers=2)
+    model = Seq2Seq.create(vocab_size_src, vocab_size_tgt, embed_dim, hidden_dim, num_layers, attention_dim)
     criterion = CrossEntropyLoss()
 
     # Get all learnable parameters
@@ -51,7 +56,7 @@ if __name__ == '__main__':
 
     best_loss = float('inf')
     print('Starting training on GPU...')
-    print(f'Config: embed_dim={embed_dim}, hidden_dim={hidden_dim}, batch_size={batch_size}')
+    print(f'Config: embed_dim={embed_dim}, hidden_dim={hidden_dim}, attention_dim={attention_dim}, batch_size={batch_size}')
     print(f'        optimizer=Adam, lr={learning_rate}, clip={clip_value}, iterations={num_iterations}')
     print(f'        vocab_src={vocab_size_src}, vocab_tgt={vocab_size_tgt}')
     for i in range(num_iterations):

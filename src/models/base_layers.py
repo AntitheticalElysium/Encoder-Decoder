@@ -219,7 +219,6 @@ class BidirectionalGRULayer(object):
         return h_combined
     
     def backward(self, grad_output):
-        batch_size, seq_len, _ = grad_output.shape
         half_hidden_dim = self.hidden_dim
 
         d_h_fwd = grad_output[:, :, :half_hidden_dim]
