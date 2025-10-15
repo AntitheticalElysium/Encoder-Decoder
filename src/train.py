@@ -62,7 +62,7 @@ if __name__ == '__main__':
     for i in range(num_iterations):
         # Simple learning rate decay
         if i > 1000:  # Warm-up period
-            current_lr = learning_rate * (0.9 ** (i // 100))
+            current_lr = learning_rate * (0.9 ** ((i - 1000) // 100))
         else:
             current_lr = learning_rate
 
@@ -83,9 +83,13 @@ if __name__ == '__main__':
         loss_gpu = criterion.forward(logits, decoder_tgt, pad_idx)
 
         loss_cpu = loss_gpu.get()
+        
+        # Backward pass
+        d_logits = criterion.backward()
+        model.backward(d_logits)
 
         if i % 100 == 0:
-            # Calculate gradient norm for monitoring
+            # Calculate gradient norm for monitoring (AFTER backward pass)
             grad_norm = 0
             for layer in all_learnable_layers:
                 if hasattr(layer, 'params'):
@@ -108,10 +112,6 @@ if __name__ == '__main__':
                     pickle.dump(model, f)
                 
                 model_to_gpu(all_learnable_layers)
-
-        # Backward pass
-        d_logits = criterion.backward()
-        model.backward(d_logits)
 
         optimizer.step()
 

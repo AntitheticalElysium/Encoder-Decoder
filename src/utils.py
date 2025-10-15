@@ -1,4 +1,5 @@
 import cupy as cp
+import numpy as np
 
 def sigmoid(x):
     # Numerically stable sigmoid
@@ -55,8 +56,6 @@ class CrossEntropyLoss(object):
         d_logits_flat[self.mask] = d_masked_logits
         
         return d_logits_flat.reshape(self.original_shape)
-
-import numpy as np
 
 def get_batch(src_ids_list, tgt_input_ids_list, tgt_output_ids_list, batch_size, pad_idx):
     num_samples = len(src_ids_list)

@@ -33,7 +33,23 @@ class Seq2Seq(object):
         return logits
     
     def backward(self, grad_output):
-        grad_encoder_states = self.decoder.backward(grad_output)
+        # Get gradients from decoder: attention grads and initial hidden grads
+        grad_encoder_states, grad_initial_hidden = self.decoder.backward(grad_output)
+        
+        # Backprop through get_initial_decoder_state
+        # initial_hidden = concat([last_fwd, first_bwd])
+        # where last_fwd = encoder_states[:, -1, :hidden_dim]
+        # and first_bwd = encoder_states[:, 0, hidden_dim:]
+        hidden_dim = self.encoder.hidden_dim
+        
+        # Split gradient
+        grad_last_fwd = grad_initial_hidden[:, :hidden_dim]
+        grad_first_bwd = grad_initial_hidden[:, hidden_dim:]
+        
+        # Add to appropriate positions in encoder_states
+        grad_encoder_states[:, -1, :hidden_dim] += grad_last_fwd
+        grad_encoder_states[:, 0, hidden_dim:] += grad_first_bwd
+        
         self.encoder.backward(grad_encoder_states)
     
     def get_all_params(self):

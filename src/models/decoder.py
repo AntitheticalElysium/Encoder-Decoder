@@ -116,4 +116,6 @@ class Decoder(object):
         
         # Backward through embedding
         self.embedding.backward(d_embedded)
-        return grad_encoder_states
+        
+        # Return both gradients: from attention and from initial hidden state
+        return grad_encoder_states, d_h_next

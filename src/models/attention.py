@@ -5,15 +5,17 @@ class BahdanauAttention(object):
         self.encoder_hidden_dim = encoder_hidden_dim
         self.decoder_hidden_dim = decoder_hidden_dim
         self.attention_dim = attention_dim
-
         # Project encoder states to attention space
-        self.W_encoder = cp.random.uniform(-0.1, 0.1, (encoder_hidden_dim, attention_dim))
+        limit_encoder = cp.sqrt(6.0 / (encoder_hidden_dim + attention_dim))
+        self.W_encoder = cp.random.uniform(-limit_encoder, limit_encoder, (encoder_hidden_dim, attention_dim))
         self.d_W_encoder = cp.zeros_like(self.W_encoder)
         # Project decoder state to attention space
-        self.W_decoder = cp.random.uniform(-0.1, 0.1, (decoder_hidden_dim, attention_dim))
+        limit_decoder = cp.sqrt(6.0 / (decoder_hidden_dim + attention_dim))
+        self.W_decoder = cp.random.uniform(-limit_decoder, limit_decoder, (decoder_hidden_dim, attention_dim))
         self.d_W_decoder = cp.zeros_like(self.W_decoder)
-        # Final attention scoring vector
-        self.v = cp.random.uniform(-0.1, 0.1, (attention_dim, 1))
+        # Final attention scoring vector - initialize with larger scale
+        limit_v = cp.sqrt(6.0 / (attention_dim + 1))
+        self.v = cp.random.uniform(-limit_v, limit_v, (attention_dim, 1))
         self.d_v = cp.zeros_like(self.v)
         
         self.params = {
@@ -51,6 +53,7 @@ class BahdanauAttention(object):
             'projected_encoder': projected_encoder,
             'projected_decoder': projected_decoder,
             'combined': combined,
+            'combined_tanh': combined_tanh,
             'attention_weights': attention_weights
         }
         self.caches.append(cache)
@@ -61,7 +64,6 @@ class BahdanauAttention(object):
         cache = self.caches[timestep]
         encoder_states = cache['encoder_states']
         decoder_state = cache['decoder_state']
-        combined = cache['combined']
         attention_weights = cache['attention_weights']
         
         batch_size, src_seq_len, _ = encoder_states.shape
@@ -78,7 +80,7 @@ class BahdanauAttention(object):
         )
         
         grad_alignment_scores_expanded = grad_alignment_scores[:, :, None]
-        combined_tanh = cp.tanh(combined)
+        combined_tanh = cache['combined_tanh']
         self.d_v += cp.dot(
             combined_tanh.reshape(-1, self.attention_dim).T,
             grad_alignment_scores_expanded.reshape(-1, 1)
@@ -88,7 +90,7 @@ class BahdanauAttention(object):
         grad_combined_tanh = grad_alignment_scores_expanded * self.v.T
         
         # Backprop through tanh
-        grad_combined = grad_combined_tanh * (1 - cp.tanh(combined) ** 2)
+        grad_combined = grad_combined_tanh * (1 - combined_tanh ** 2)
         
         # Split grads
         grad_projected_encoder = grad_combined
