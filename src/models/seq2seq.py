@@ -69,7 +69,7 @@ class Seq2Seq(object):
         
         return all_layers
     
-    def predict(self, sentence, vocab_src, vocab_tgt, max_len=15):
+    def predict(self, sentence, vocab_src, vocab_tgt, max_len=25):
         # Preprocess if string
         if isinstance(sentence, str):
             sentence = sentence.lower()

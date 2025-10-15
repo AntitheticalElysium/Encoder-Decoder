@@ -39,9 +39,9 @@ if __name__ == '__main__':
 
     embed_dim = 384
     hidden_dim = 384 
-    attention_dim = 128
+    attention_dim = 192
     num_layers = 2
-    batch_size = 32  
+    batch_size = 32
     num_iterations = 5000
     learning_rate = 0.001
     clip_value = 5.0
@@ -62,7 +62,7 @@ if __name__ == '__main__':
     for i in range(num_iterations):
         # Simple learning rate decay
         if i > 1000:  # Warm-up period
-            current_lr = learning_rate * (0.9 ** ((i - 1000) // 100))
+            current_lr = learning_rate * (0.95 ** ((i - 1000) // 100))
         else:
             current_lr = learning_rate
 
@@ -89,7 +89,7 @@ if __name__ == '__main__':
         model.backward(d_logits)
 
         if i % 100 == 0:
-            # Calculate gradient norm for monitoring (AFTER backward pass)
+            # Calculate gradient norm for monitoring
             grad_norm = 0
             for layer in all_learnable_layers:
                 if hasattr(layer, 'params'):

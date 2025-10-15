@@ -26,7 +26,11 @@ if __name__ == '__main__':
         "she is very smart .",
         "the car is red and gold .",
         "i really like eating cucumbers .",
-        "i played with my friends yesterday ."
+        "i played with my friends yesterday .",
+        "the young warrior stood at the edge of the cliff watching the sun rise over the distant mountains .",
+        "when i was walking through the dark forest yesterday i saw a beautiful bird singing in the tall trees .",
+        "my friend told me that he would arrive at the station before noon but he was late because of the heavy rain .",
+        "she carefully placed the delicate glass vase on the wooden table near the window overlooking the garden ."
     ]
 
     print("\nStarting Translation")
