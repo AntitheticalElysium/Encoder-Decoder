@@ -34,11 +34,11 @@ if __name__ == '__main__':
     vocab_size_src = len(vocab_src)
     vocab_size_tgt = len(vocab_tgt)
 
-    embed_dim = 256
-    hidden_dim = 256
+    embed_dim = 384
+    hidden_dim = 384
     batch_size = 64
-    num_iterations = 10000
-    learning_rate = 0.001  
+    num_iterations = 5000
+    learning_rate = 0.001
     clip_value = 5.0
 
     # Create Seq2Seq model
@@ -54,19 +54,13 @@ if __name__ == '__main__':
     print(f'Config: embed_dim={embed_dim}, hidden_dim={hidden_dim}, batch_size={batch_size}')
     print(f'        optimizer=Adam, lr={learning_rate}, clip={clip_value}, iterations={num_iterations}')
     print(f'        vocab_src={vocab_size_src}, vocab_tgt={vocab_size_tgt}')
-    print(f'        LR schedule: 0.001 (0-1500) -> 0.0005 (1500-5000) -> 0.0001 (5000+)')
     for i in range(num_iterations):
-        # Learning rate schedule to reduce oscillations
-        if i >= 3000:
-            current_lr = 0.00005
-        elif i >= 1500:
-            current_lr = 0.00025
-        else:
-            current_lr = learning_rate
+        # Simple learning rate decay
+        current_lr = learning_rate * (0.9 ** (i // 100))
         
         if optimizer.learning_rate != current_lr:
             optimizer.learning_rate = current_lr
-            print(f'  -> Learning rate changed to {current_lr} at iteration {i}')
+            print(f'  -> Learning rate changed to {current_lr}')
         input_cpu, dec_in_cpu, dec_tgt_cpu = get_batch(src_ids_list, tgt_input_ids_list, tgt_output_ids_list, batch_size, pad_idx)
         
         # Convert to CuPy arrays

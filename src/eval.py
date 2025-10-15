@@ -24,7 +24,9 @@ if __name__ == '__main__':
         "this is a big house .",
         "we are driving a car .",
         "she is very smart .",
-        "the car is red and gold ."
+        "the car is red and gold .",
+        "i really like eating cucumbers .",
+        "i played with my friends yesterday ."
     ]
 
     print("\nStarting Translation")
