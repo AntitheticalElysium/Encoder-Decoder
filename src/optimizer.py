@@ -122,9 +122,11 @@ class Adam(object):
                     grad = getattr(layer, 'd_' + key)
                     grad.fill(0)
         
-        # Also zero GRU cell gradients
+        # Also zero GRU cell gradients and attention gradients
         for layer in self.layers:
-            if hasattr(layer, 'gru_cell') and hasattr(layer.gru_cell, 'zero_grad'):
+            if hasattr(layer, 'zero_grad'):
+                layer.zero_grad()
+            elif hasattr(layer, 'gru_cell') and hasattr(layer.gru_cell, 'zero_grad'):
                 layer.gru_cell.zero_grad()
             elif hasattr(layer, 'forward_gru') and hasattr(layer, 'backward_gru'):
                 # Bidirectional layer

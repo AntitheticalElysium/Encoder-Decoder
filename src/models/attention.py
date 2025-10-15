@@ -23,55 +23,62 @@ class BahdanauAttention(object):
         }
 
         # Cache for backward pass
-        self.encoder_states = None
-        self.decoder_state = None
-        self.attention_weights = None
-        self.projected_encoder = None
-        self.projected_decoder = None
-        self.alignment_scores = None
+        self.caches = [] 
     
     def forward(self, encoder_states, decoder_state):
         batch_size, src_seq_len, _ = encoder_states.shape
 
-        # Save for backward
-        self.encoder_states = encoder_states
-        self.decoder_state = decoder_state
-
-        # Encoder/decoder representations to attention space
-        self.projected_encoder = cp.dot(encoder_states.reshape(-1, self.encoder_hidden_dim),
+        # Project to attention space
+        projected_encoder = cp.dot(encoder_states.reshape(-1, self.encoder_hidden_dim),
             self.W_encoder).reshape(batch_size, src_seq_len, self.attention_dim)
-        self.projected_decoder = cp.dot(decoder_state, self.W_decoder)
+        projected_decoder = cp.dot(decoder_state, self.W_decoder)
         
         # "How does this src token relate to what we're decoding?"
-        combined = self.projected_encoder + self.projected_decoder[:, None, :]
+        combined = projected_encoder + projected_decoder[:, None, :]
         combined_tanh = cp.tanh(combined)
 
         # Score for how relevant each token is to decoder state (0 to 1)
-        self.alignment_scores = cp.dot(combined_tanh.reshape(-1, self.attention_dim),
+        alignment_scores = cp.dot(combined_tanh.reshape(-1, self.attention_dim),
             self.v).reshape(batch_size, src_seq_len)
-        self.attention_weights = self._softmax(self.alignment_scores)
+        attention_weights = self._softmax(alignment_scores)
         
-        context_vector = cp.matmul(self.attention_weights[:, None, :], encoder_states).squeeze(1)
-        return context_vector, self.attention_weights
+        context_vector = cp.matmul(attention_weights[:, None, :], encoder_states).squeeze(1)
+        
+        # Cache everything needed for backward
+        cache = {
+            'encoder_states': encoder_states,
+            'decoder_state': decoder_state,
+            'projected_encoder': projected_encoder,
+            'projected_decoder': projected_decoder,
+            'combined': combined,
+            'attention_weights': attention_weights
+        }
+        self.caches.append(cache)
+        
+        return context_vector, attention_weights
     
-    def backward(self, grad_context):
-        batch_size, src_seq_len, _ = self.encoder_states.shape
+    def backward(self, grad_context, timestep):
+        cache = self.caches[timestep]
+        encoder_states = cache['encoder_states']
+        decoder_state = cache['decoder_state']
+        combined = cache['combined']
+        attention_weights = cache['attention_weights']
+        
+        batch_size, src_seq_len, _ = encoder_states.shape
 
-        grad_encoder_from_sum = self.attention_weights[:, :, None] * grad_context[:, None, :]
+        grad_encoder_from_sum = attention_weights[:, :, None] * grad_context[:, None, :]
         grad_attention_weights = cp.sum(
-            self.encoder_states * grad_context[:, None, :],
+            encoder_states * grad_context[:, None, :],
             axis=2
         )
         # Backprop through softmax
         grad_alignment_scores = self._softmax_backward(
-            self.attention_weights,
+            attention_weights,
             grad_attention_weights
         )
         
         grad_alignment_scores_expanded = grad_alignment_scores[:, :, None]
-        combined_tanh = cp.tanh(
-            self.projected_encoder + self.projected_decoder[:, None, :]
-        )
+        combined_tanh = cp.tanh(combined)
         self.d_v += cp.dot(
             combined_tanh.reshape(-1, self.attention_dim).T,
             grad_alignment_scores_expanded.reshape(-1, 1)
@@ -81,7 +88,6 @@ class BahdanauAttention(object):
         grad_combined_tanh = grad_alignment_scores_expanded * self.v.T
         
         # Backprop through tanh
-        combined = self.projected_encoder + self.projected_decoder[:, None, :]
         grad_combined = grad_combined_tanh * (1 - cp.tanh(combined) ** 2)
         
         # Split grads
@@ -90,7 +96,7 @@ class BahdanauAttention(object):
         
 
         self.d_W_encoder += cp.dot(
-            self.encoder_states.reshape(-1, self.encoder_hidden_dim).T,
+            encoder_states.reshape(-1, self.encoder_hidden_dim).T,
             grad_projected_encoder.reshape(-1, self.attention_dim)
         )
         grad_encoder_from_proj = cp.dot(
@@ -100,11 +106,11 @@ class BahdanauAttention(object):
         
 
         self.d_W_decoder += cp.dot(
-            self.decoder_state.T,
+            decoder_state.T,
             grad_projected_decoder
         )
         
-        # Combine gradss
+        # Combine grads
         grad_decoder_state = cp.dot(grad_projected_decoder, self.W_decoder.T)
         grad_encoder_states = grad_encoder_from_sum + grad_encoder_from_proj
         

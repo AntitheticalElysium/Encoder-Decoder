@@ -61,8 +61,11 @@ if __name__ == '__main__':
     print(f'        vocab_src={vocab_size_src}, vocab_tgt={vocab_size_tgt}')
     for i in range(num_iterations):
         # Simple learning rate decay
-        current_lr = learning_rate * (0.9 ** (i // 100))
-        
+        if i > 1000:  # Warm-up period
+            current_lr = learning_rate * (0.9 ** (i // 100))
+        else:
+            current_lr = learning_rate
+
         if optimizer.learning_rate != current_lr:
             optimizer.learning_rate = current_lr
             print(f'  -> Learning rate changed to {current_lr}')

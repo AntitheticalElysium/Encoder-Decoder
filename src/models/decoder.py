@@ -35,6 +35,7 @@ class Decoder(object):
     def params(self):
         combined_params = {
             'embedding': self.embedding.params,
+            'attention': self.attention.params,
             'fc': self.fc.params
         }
         for i, layer in enumerate(self.layers):
@@ -56,8 +57,9 @@ class Decoder(object):
         else:
             h_t = cp.zeros((batch_size, self.hidden_dim * 2))
         
-        # Reset caches for first layer
+        # Reset caches for first layer and attention
         self.layers[0].caches = []
+        self.attention.caches = []
         
         # Process each timestep with attention
         outputs = []
@@ -105,8 +107,8 @@ class Decoder(object):
             # Split grad
             d_x_t = d_decoder_input[:, :self.embedding.embed_dim]
             d_context_t = d_decoder_input[:, self.embedding.embed_dim:]
-            # Backward through attention
-            d_encoder_t, d_h_for_attn = self.attention.backward(d_context_t)
+            # Backward through attention with correct timestep
+            d_encoder_t, d_h_for_attn = self.attention.backward(d_context_t, t)
             grad_encoder_states += d_encoder_t
             # Accumulate gradients
             d_embedded[:, t, :] = d_x_t
