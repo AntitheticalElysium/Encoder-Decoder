@@ -37,9 +37,9 @@ if __name__ == '__main__':
     vocab_size_src = len(vocab_src)
     vocab_size_tgt = len(vocab_tgt)
 
-    embed_dim = 384
-    hidden_dim = 384 
-    attention_dim = 192
+    embed_dim = 512
+    hidden_dim = 512
+    attention_dim = 512
     num_layers = 2
     batch_size = 32
     num_iterations = 5000
